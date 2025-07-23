@@ -1264,7 +1264,7 @@ Choose your plan:"""
         context.user_data['expecting'] = None
         
         
-def main():
+async def main():
     """Main function to run the bot"""
     # Get token from environment variable
     TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
