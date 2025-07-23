@@ -297,7 +297,7 @@ Choose an option below to get started!
                     subreddit = self.reddit.subreddit(subreddit_name)
 
                     # Search for posts containing the symbol
-                    for post in subreddit.search(symbol, limit=100, time_filter='day'):
+                    for post in subreddit.search(symbol, limit=300, time_filter='day'):
                         # Process post title and content
                         text = f"{post.title} {post.selftext}"
                         clean_text = self.clean_text(text)
@@ -315,7 +315,7 @@ Choose an option below to get started!
 
                         # Also process top comments
                         post.comments.replace_more(limit=0)
-                        for comment in post.comments[:15]:  # Top 5 comments
+                        for comment in post.comments[:50]:  # Top 50 comments
                             if hasattr(comment, 'body') and len(comment.body) > 20:
                                 clean_comment = self.clean_text(comment.body)
                                 comment_sentiment = self.get_sentiment_score(clean_comment)
@@ -361,7 +361,7 @@ Choose an option below to get started!
                     language='en',
                     sort_by='publishedAt',
                     from_param=(datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-                    page_size=100
+                    page_size=300
                 )
 
                 for article in articles.get('articles', []):
@@ -1098,7 +1098,7 @@ Choose your plan:"""
             "📊 Gathering social media data...\n"
             "📈 Fetching price information...\n"
             "🧠 Computing sentiment score...\n\n"
-            "*This may take 10-15 seconds*"
+            "*This may take 30-60 seconds*"
         )
 
         # Perform analysis
