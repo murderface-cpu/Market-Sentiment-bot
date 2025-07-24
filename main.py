@@ -368,7 +368,7 @@ Choose an option below to get started!
                     language='en',
                     sort_by='publishedAt',
                     from_param=(datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'),
-                    page_size=300
+                    page_size=100
                 )
 
                 for article in articles.get('articles', []):
@@ -1284,14 +1284,22 @@ async def handle_logs(request):
         return web.Response(text="Log file not found", status=404)
 
 async def start_http_server():
+    # Get port from environment variable (Render sets this)
+    port = int(os.getenv('PORT', 8080))
+    
     app = web.Application()
     app.router.add_get("/health", handle_health)
     app.router.add_get("/logs", handle_logs)
+    
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, port=8080)
+    
+    # Bind to 0.0.0.0 to accept connections from anywhere
+    site = web.TCPSite(runner, host='0.0.0.0', port=port)
     await site.start()
-    logger.info("🌐 HTTP server running at http://localhost:8080")
+    
+    logger.info(f"🌐 HTTP server running on port {port}")
+    return runner
 
 # Main bot function
 async def main():
@@ -1299,22 +1307,26 @@ async def main():
     if not TOKEN:
         logger.error("❌ Please set TELEGRAM_BOT_TOKEN environment variable")
         return
-
+    
     bot = MarketSentimentBot(TOKEN)
     application = Application.builder().token(TOKEN).build()
-
+    
     # Add handlers
     application.add_handler(CommandHandler("start", bot.start))
     application.add_handler(CallbackQueryHandler(bot.handle_callback_query))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_message))
-
+    
     logger.info("🚀 Market Sentiment Bot is starting...")
-
-    # Run both the bot and the HTTP server concurrently
-    await asyncio.gather(
-        application.run_polling(allowed_updates=Update.ALL_TYPES),
-        start_http_server()
-    )
+    
+    # Start HTTP server first and wait for it to be ready
+    http_runner = await start_http_server()
+    
+    try:
+        # Run the bot
+        await application.run_polling(allowed_updates=Update.ALL_TYPES)
+    finally:
+        # Clean up the HTTP server when shutting down
+        await http_runner.cleanup()
 
 if __name__ == '__main__':
     asyncio.run(main())
