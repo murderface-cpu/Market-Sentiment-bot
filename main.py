@@ -35,10 +35,17 @@ from datetime import timezone
 import time
 from typing import Dict, List, Optional
 
-# Configure logging
+from aiohttp import web
+
+# Setup logging
+LOG_FILE = "bot.log"
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -1264,18 +1271,36 @@ Choose your plan:"""
         context.user_data['expecting'] = None
         
         
+# Simple aiohttp server for health check and logs
+async def handle_health(request):
+    return web.Response(text="✅ Market Sentiment Bot is healthy!", status=200)
+
+async def handle_logs(request):
+    try:
+        with open(LOG_FILE, "r") as f:
+            content = f.read()[-5000:]  # Last 5000 characters
+        return web.Response(text=content, content_type='text/plain')
+    except FileNotFoundError:
+        return web.Response(text="Log file not found", status=404)
+
+async def start_http_server():
+    app = web.Application()
+    app.router.add_get("/health", handle_health)
+    app.router.add_get("/logs", handle_logs)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=8080)
+    await site.start()
+    logger.info("🌐 HTTP server running at http://localhost:8080")
+
+# Main bot function
 async def main():
-    """Main function to run the bot"""
-    # Get token from environment variable
     TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
     if not TOKEN:
-        print("Please set TELEGRAM_BOT_TOKEN environment variable")
+        logger.error("❌ Please set TELEGRAM_BOT_TOKEN environment variable")
         return
 
-    # Create bot instance
     bot = MarketSentimentBot(TOKEN)
-
-    # Create application
     application = Application.builder().token(TOKEN).build()
 
     # Add handlers
@@ -1283,9 +1308,13 @@ async def main():
     application.add_handler(CallbackQueryHandler(bot.handle_callback_query))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_message))
 
-    # Start the bot
-    print("🚀 Market Sentiment Bot is starting...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("🚀 Market Sentiment Bot is starting...")
+
+    # Run both the bot and the HTTP server concurrently
+    await asyncio.gather(
+        application.run_polling(allowed_updates=Update.ALL_TYPES),
+        start_http_server()
+    )
 
 if __name__ == '__main__':
     asyncio.run(main())
