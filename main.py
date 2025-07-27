@@ -990,6 +990,23 @@ Choose your plan:"""
 
     async def show_main_menu(self, query):
         """Show the main menu"""
+        welcome_message = f"""
+🔮 **Market Sentiment Oracle** 🔮
+
+Welcome {user.first_name}! I analyze real-time social media buzz, news sentiment, and market indicators to give you edge in trading decisions.
+
+📊 **What I can do:**
+• Analyze sentiment for any stock/crypto
+• Generate beautiful sentiment reports
+• Track sentiment trends over time
+• Send daily market mood updates
+• Provide trading signals based on sentiment
+
+🆓 **Free Plan:** 5 analyses per day
+💎 **Premium Plan:** Unlimited + alerts + API access
+
+Choose an option below to get started!
+        """
         keyboard = [
             [InlineKeyboardButton("📊 Analyze Stock/Crypto", callback_data="analyze_stock")],
             [InlineKeyboardButton("🔔 Setup Alerts", callback_data="setup_alerts")],
@@ -1000,9 +1017,7 @@ Choose your plan:"""
 
         try:
             await query.edit_message_text(
-                "🤖 **AI Sentiment Tracker**\n\n"
-                "Track market sentiment for stocks and crypto with AI-powered analysis.\n\n"
-                "What would you like to do?",
+                welcome_message,
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
@@ -1088,7 +1103,8 @@ Choose your plan:"""
 
         # Check user limits
         if not self.can_analyze(user_id):
-            keyboard = [[InlineKeyboardButton("💎 Upgrade to Premium", callback_data="upgrade_premium")]]
+            keyboard = [[InlineKeyboardButton("💎 Upgrade to Premium", callback_data="upgrade_premium")]
+                       [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_to_menu")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
@@ -1125,6 +1141,7 @@ Choose your plan:"""
             keyboard = [
                 [
                     # InlineKeyboardButton("📊 View Chart", url=analysis['chart_url']),
+                    [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_to_menu")],
                     InlineKeyboardButton("🔔 Set Alert", callback_data=f"alert_{symbol}")
                 ],
                 [
