@@ -1432,7 +1432,6 @@ async def start_http_server(bot_instance):
     
     # New chart serving routes
     app.router.add_get("/chart/{chart_id}", handle_chart)
-    app.router.add_get("/charts", handle_chart_list)  # Optional: list all charts
     
     runner = web.AppRunner(app)
     await runner.setup()
