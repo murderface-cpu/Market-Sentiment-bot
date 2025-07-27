@@ -76,6 +76,8 @@ class MarketSentimentBot:
         # Initialize APIs
         self.init_apis()
         self.init_database()
+        self.chart_storage = {}  # Store charts temporarily
+        self.base_url = os.getenv('BASE_URL', 'https://market-sentiment-bot.onrender.com')
 
     def init_database(self):
         """Initialize SQLite database for user data and analytics"""
@@ -172,7 +174,6 @@ Choose an option below to get started!
 
             # Generate visualization
             chart_url = await self.generate_sentiment_chart_v2(symbol, sentiment_score, price_data)
-            logger.error(chart_url)
             #await self.generate_and_send_chart(symbol, sentiment_score, price_data)
 
             # Store in database
@@ -739,9 +740,86 @@ Choose an option below to get started!
         return chart_filename
 
     # Alternative Method 2: Use proper subplot configuration for indicators
-    async def generate_sentiment_chart_v2(self, symbol: str, sentiment: float, price_data: Dict) -> str:
-        """Alternative approach with proper subplot types"""
+    # async def generate_sentiment_chart_v2(self, symbol: str, sentiment: float, price_data: Dict) -> str:
+    #     """Alternative approach with proper subplot types"""
 
+    #     # Create subplots with different types
+    #     fig = make_subplots(
+    #         rows=2, cols=1,
+    #         subplot_titles=(f"{symbol} Sentiment Analysis", "Price Movement"),
+    #         vertical_spacing=0.15,
+    #         row_heights=[0.6, 0.4],
+    #         specs=[[{"type": "indicator"}],
+    #               [{"type": "xy"}]]  # Specify subplot types
+    #     )
+
+    #     # Sentiment gauge
+    #     sentiment_color = '#4CAF50' if sentiment > 0 else '#F44336' if sentiment < -0.2 else '#FF9800'
+    #     fig.add_trace(go.Indicator(
+    #         mode="gauge+number+delta",
+    #         value=sentiment * 100,
+    #         title={'text': "Sentiment Score"},
+    #         gauge={
+    #             'axis': {'range': [-100, 100]},
+    #             'bar': {'color': sentiment_color},
+    #             'steps': [
+    #                 {'range': [-100, -20], 'color': '#FFCDD2'},
+    #                 {'range': [-20, 20], 'color': '#FFF3E0'},
+    #                 {'range': [20, 100], 'color': '#C8E6C9'}
+    #             ],
+    #             'threshold': {
+    #                 'line': {'color': "red", 'width': 4},
+    #                 'thickness': 0.75,
+    #                 'value': 0
+    #             }
+    #         }
+    #     ), row=1, col=1)
+
+    #     # Price chart
+    #     if price_data.get('history'):
+    #         df = pd.DataFrame(price_data['history'])
+
+    #         # Handle different date formats
+    #         if 'Date' in df.columns:
+    #             x_data = pd.to_datetime(df['Date'])
+    #         else:
+    #             x_data = df.index
+
+    #         fig.add_trace(go.Scatter(
+    #             x=x_data,
+    #             y=df['Close'],
+    #             mode='lines',
+    #             name='Price',
+    #             line=dict(color='#2196F3', width=2)
+    #         ), row=2, col=1)
+
+    #     fig.update_layout(
+    #         height=600,
+    #         showlegend=False,
+    #         paper_bgcolor='#1E1E1E',
+    #         plot_bgcolor='#1E1E1E',
+    #         font=dict(color='white'),
+    #         title=dict(
+    #             text=f"Market Sentiment Analysis: {symbol}",
+    #             font=dict(size=20, color='white')
+    #         )
+    #     )
+
+    #     # Save as PNG file
+    #     chart_filename = f"sentiment_{symbol}_{int(datetime.now().timestamp())}.png"
+    #     fig.write_image(
+    #         chart_filename,
+    #         format='png',
+    #         width=800,
+    #         height=600,
+    #         scale=2  # Higher scale for better quality
+    #     )
+
+    #     return chart_filename
+
+    async def generate_sentiment_chart_v2(self, symbol: str, sentiment: float, price_data: Dict) -> str:
+        """Generate chart and return URL for web serving"""
+        
         # Create subplots with different types
         fig = make_subplots(
             rows=2, cols=1,
@@ -749,7 +827,7 @@ Choose an option below to get started!
             vertical_spacing=0.15,
             row_heights=[0.6, 0.4],
             specs=[[{"type": "indicator"}],
-                  [{"type": "xy"}]]  # Specify subplot types
+                  [{"type": "xy"}]]
         )
 
         # Sentiment gauge
@@ -777,8 +855,6 @@ Choose an option below to get started!
         # Price chart
         if price_data.get('history'):
             df = pd.DataFrame(price_data['history'])
-
-            # Handle different date formats
             if 'Date' in df.columns:
                 x_data = pd.to_datetime(df['Date'])
             else:
@@ -804,17 +880,34 @@ Choose an option below to get started!
             )
         )
 
-        # Save as PNG file
-        chart_filename = f"sentiment_{symbol}_{int(datetime.now().timestamp())}.png"
-        fig.write_image(
-            chart_filename,
-            format='png',
-            width=800,
-            height=600,
-            scale=2  # Higher scale for better quality
-        )
-
-        return chart_filename
+        # Generate unique chart ID
+        chart_id = f"{symbol}_{int(datetime.now().timestamp())}"
+        
+        # Convert chart to PNG bytes
+        img_bytes = fig.to_image(format="png", width=800, height=600, scale=2)
+        
+        # Store in memory with expiration (1 hour)
+        self.chart_storage[chart_id] = {
+            'data': img_bytes,
+            'created_at': datetime.now(),
+            'symbol': symbol
+        }
+        
+        # Clean old charts (optional - keep memory usage low)
+        self.cleanup_old_charts()
+        
+        # Return URL to serve the chart
+        return f"{self.base_url}/chart/{chart_id}"
+    
+    def cleanup_old_charts(self):
+        """Remove charts older than 1 hour"""
+        cutoff = datetime.now() - timedelta(hours=1)
+        expired_charts = [
+            chart_id for chart_id, data in self.chart_storage.items()
+            if data['created_at'] < cutoff
+        ]
+        for chart_id in expired_charts:
+            del self.chart_storage[chart_id]
 
     # Method 3: Simple bar chart alternative (if gauge doesn't work)
     async def generate_sentiment_chart_simple(self, symbol: str, sentiment: float, price_data: Dict) -> str:
@@ -1133,24 +1226,27 @@ Choose an option below to get started!
             # Create detailed result message
             result_message = self.format_analysis_result(analysis)
 
-            # Send photo directly
-            with open(analysis['chart_url'], 'rb') as photo:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=f"📊 Sentiment Analysis for {symbol}"
-                )
+            # # Send photo directly
+            # with open(analysis['chart_url'], 'rb') as photo:
+            #     await update.message.reply_photo(
+            #         photo=photo,
+            #         caption=f"📊 Sentiment Analysis for {symbol}"
+            #     )
+            
             # Create action buttons
             keyboard = [
-                [
-                    # InlineKeyboardButton("📊 View Chart", url=analysis['chart_url']),
-                    InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_to_menu"),
-                    InlineKeyboardButton("🔔 Set Alert", callback_data=f"alert_{symbol}")
-                ],
-                [
-                    InlineKeyboardButton("📧 Email Report", callback_data=f"email_{symbol}"),
-                    InlineKeyboardButton("📈 Analyze Another", callback_data="analyze_stock")
-                ]
+            [
+                InlineKeyboardButton("📊 View Chart", url=analysis['chart_url']),  # Now this works!
+                InlineKeyboardButton("🔔 Set Alert", callback_data=f"alert_{symbol}")
+            ],
+            [
+                InlineKeyboardButton("📧 Email Report", callback_data=f"email_{symbol}"),
+                InlineKeyboardButton("📈 Analyze Another", callback_data="analyze_stock")
+            ],
+            [
+                InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_to_menu")
             ]
+        ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await analyzing_msg.edit_text(result_message, reply_markup=reply_markup, parse_mode='Markdown')
@@ -1289,6 +1385,26 @@ Choose an option below to get started!
 
         context.user_data['expecting'] = None
         
+# Chart serving endpoints to your HTTP server
+async def handle_chart(request):
+    """Serve chart images"""
+    chart_id = request.match_info['chart_id']
+    
+    # Get bot instance (you'll need to pass this to the handler)
+    bot = request.app['bot_instance']
+    
+    if chart_id in bot.chart_storage:
+        chart_data = bot.chart_storage[chart_id]
+        return web.Response(
+            body=chart_data['data'],
+            content_type='image/png',
+            headers={
+                'Cache-Control': 'public, max-age=3600',  # Cache for 1 hour
+                'Content-Disposition': f'inline; filename="{chart_data["symbol"]}_sentiment.png"'
+            }
+        )
+    else:
+        return web.Response(text="Chart not found or expired", status=404)      
         
 # Simple aiohttp server for health check and logs
 async def handle_health(request):
@@ -1302,24 +1418,32 @@ async def handle_logs(request):
     except FileNotFoundError:
         return web.Response(text="Log file not found", status=404)
 
-async def start_http_server():
-    # Get port from environment variable (Render sets this)
+async def start_http_server(bot_instance):
     port = int(os.getenv('PORT', 8080))
     
     app = web.Application()
+    
+    # Store bot instance for access in handlers
+    app['bot_instance'] = bot_instance
+    
+    # Existing routes
     app.router.add_get("/health", handle_health)
     app.router.add_get("/logs", handle_logs)
+    
+    # New chart serving routes
+    app.router.add_get("/chart/{chart_id}", handle_chart)
+    app.router.add_get("/charts", handle_chart_list)  # Optional: list all charts
     
     runner = web.AppRunner(app)
     await runner.setup()
     
-    # Bind to 0.0.0.0 to accept connections from anywhere
     site = web.TCPSite(runner, host='0.0.0.0', port=port)
     await site.start()
     
     logger.info(f"🌐 HTTP server running on port {port}")
+    logger.info(f"📊 Chart serving available at /chart/{{chart_id}}")
     return runner
-
+    
 # Main bot function
 async def main():
     TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -1338,7 +1462,7 @@ async def main():
     logger.info("🚀 Market Sentiment Bot is starting...")
     
     # Start HTTP server first and wait for it to be ready
-    http_runner = await start_http_server()
+    http_runner = await start_http_server(bot)
     
     try:
         # Run the bot
