@@ -57,6 +57,7 @@ os.environ['REDDIT_CLIENT_SECRET'] ='QQe7bEDGja89k3POkbQJLUfup5nbcg'
 os.environ['REDDIT_USER_AGENT'] = 'MarketSentimentBot/1.0'
 # News API (free tier: 1000 requests/month)
 os.environ['NEWS_API_KEY'] = '7c397cd6b8b74e5db62726948308a3d7'
+User = None
 
 class MarketSentimentBot:
     def __init__(self, token: str):
@@ -114,6 +115,7 @@ class MarketSentimentBot:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Start command handler"""
         user = update.effective_user
+        User = user
         self.register_user(user.id, user.username)
 
         welcome_message = f"""
@@ -993,7 +995,7 @@ Choose your plan:"""
         welcome_message = f"""
 🔮 **Market Sentiment Oracle** 🔮
 
-Welcome {user.first_name}! I analyze real-time social media buzz, news sentiment, and market indicators to give you edge in trading decisions.
+Welcome {User.first_name}! I analyze real-time social media buzz, news sentiment, and market indicators to give you edge in trading decisions.
 
 📊 **What I can do:**
 • Analyze sentiment for any stock/crypto
@@ -1016,7 +1018,7 @@ Choose an option below to get started!
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         try:
-            await update.message.reply_text(
+            await query.edit_message_text(
                 welcome_message,
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
