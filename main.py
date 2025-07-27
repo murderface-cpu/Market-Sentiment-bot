@@ -1016,7 +1016,7 @@ Choose an option below to get started!
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         try:
-            await query.edit_message_text(
+            await update.message.reply_text(
                 welcome_message,
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
