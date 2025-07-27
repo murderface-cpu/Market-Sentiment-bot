@@ -136,7 +136,7 @@ Choose an option below to get started!
 
         keyboard = [
             [InlineKeyboardButton("📈 Analyze Stock/Crypto", callback_data="analyze_stock")],
-            [InlineKeyboardButton("📊 View Dashboard", web_app=WebAppInfo(url="https://thirdconcept.co.ke"))],
+            [InlineKeyboardButton("Check Application Health", web_app=WebAppInfo(url="https://market-sentiment-bot.onrender.com/health"))],
             [InlineKeyboardButton("🔔 Setup Alerts", callback_data="setup_alerts")],
             [InlineKeyboardButton("💎 Upgrade to Premium", callback_data="upgrade_premium")],
             [InlineKeyboardButton("📧 Email Settings", callback_data="email_settings")]
