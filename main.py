@@ -1103,8 +1103,10 @@ Choose an option below to get started!
 
         # Check user limits
         if not self.can_analyze(user_id):
-            keyboard = [[InlineKeyboardButton("💎 Upgrade to Premium", callback_data="upgrade_premium")]
-                       [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_to_menu")]]
+            keyboard = [
+                            [InlineKeyboardButton("💎 Upgrade to Premium", callback_data="upgrade_premium")],
+                            [InlineKeyboardButton("⬅️ Back to Menu", callback_data="back_to_menu")]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
